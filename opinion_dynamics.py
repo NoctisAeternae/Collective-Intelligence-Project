@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from vi import Agent, Simulation
 from vi.config import Config
 import random
+import polars as pl
 
 @dataclass
 class FlockingConfig(Config): ...
@@ -47,9 +48,16 @@ class OpinionAgent(Agent[FlockingConfig]):
 
 
 
-(
+df = (
     # Step 1: Create a new simulation.
-    Simulation(FlockingConfig(image_rotation=True, movement_speed=1, radius=50))
+    Simulation(FlockingConfig(
+        image_rotation=True, 
+        movement_speed=1, 
+        radius=50,
+        fps_limit=60,
+        duration=10*60,
+        seed=42
+        ))
     # Step 2: Add 50 agents to the simulation.
 
     .batch_spawn_agents(10, OpinionAgent, images=IMAGES, belief="left")
@@ -59,4 +67,12 @@ class OpinionAgent(Agent[FlockingConfig]):
     .batch_spawn_agents(10, OpinionAgent, images=IMAGES, belief="right")
     # Step 3: Profit! 🎉
     .run()
+    .snapshots
 )
+
+num_opinion_clusters = len(df.filter(pl.col("frame") == 600).select("image_index").unique())
+
+print(num_opinion_clusters)
+
+# save results
+df.write_parquet("results.parquet")
