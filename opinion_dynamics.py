@@ -54,23 +54,23 @@ df = (
         image_rotation=True, 
         movement_speed=1, 
         radius=50,
-        fps_limit=60,
-        duration=10*60,
+        fps_limit=0,
+        duration=120*60,
         seed=42
         ))
     # Step 2: Add 50 agents to the simulation.
 
-    .batch_spawn_agents(10, OpinionAgent, images=IMAGES, belief="left")
-    .batch_spawn_agents(10, OpinionAgent, images=IMAGES, belief="center-left")
-    .batch_spawn_agents(10, OpinionAgent, images=IMAGES, belief="middle")
-    .batch_spawn_agents(10, OpinionAgent, images=IMAGES, belief="center-right")
-    .batch_spawn_agents(10, OpinionAgent, images=IMAGES, belief="right")
+    .batch_spawn_agents(20, OpinionAgent, images=IMAGES, belief="left")
+    .batch_spawn_agents(20, OpinionAgent, images=IMAGES, belief="center-left")
+    .batch_spawn_agents(20, OpinionAgent, images=IMAGES, belief="middle")
+    .batch_spawn_agents(20, OpinionAgent, images=IMAGES, belief="center-right")
+    .batch_spawn_agents(20, OpinionAgent, images=IMAGES, belief="right")
     # Step 3: Profit! 🎉
     .run()
     .snapshots
 )
 
-num_opinion_clusters = len(df.filter(pl.col("frame") == 600).select("image_index").unique())
+num_opinion_clusters = len(df.filter(pl.col("frame") == 7200).select("image_index").unique())
 
 print(num_opinion_clusters)
 
