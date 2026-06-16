@@ -38,7 +38,7 @@ __all__ = [
 
 BELIEFS = {"left": 0, "center-left": 1, "middle": 2, "center-right": 3, "right": 4}
 
-BELIEF_TO_PROB = {0: 0.9, 1: 0.75, 2: 0.5, 3: 0.75, 4: 0.9}
+BELIEF_TO_PROB = {0: 0.9, 1: 0.833, 2: 0.5, 3: 0.833, 4: 0.9}
 
 class Agent[ConfigClass: Config = Config](Sprite):
     """The `Agent` class is home to Violet's various additions and is built on top of [PyGame's Sprite](https://www.pygame.org/docs/ref/sprite.html) class.
