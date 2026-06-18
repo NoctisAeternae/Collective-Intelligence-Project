@@ -8,12 +8,13 @@ import matplotlib.pyplot as plt
 import scipy.stats as ss
 import scikit_posthocs as sp
 import pandas as pd
+import time
 
 @dataclass
 class OpinionConfig(Config): ...
 
 BELIEFS = {"left": 0, "center-left": 1, "middle": 2, "center-right": 3, "right": 4}
-BELIEF_TO_PROB = {0: 0.9, 1: 0.833, 2: 0.5, 3: 0.833, 4: 0.9}
+BELIEF_TO_PROB = {0: 0.915, 1: 0.58, 2: 0.5, 3: 0.58, 4: 0.915}
 
 IMAGES = ["images/left.png", "images/center-left.png", "images/middle.png", "images/center-right.png", "images/right.png"]
 
@@ -23,6 +24,13 @@ CODE_TO_NAME = {0: "left", 1: "center-left", 2: "middle", 3: "center-right", 4: 
 COLORS = {0: "#2166ac", 1: "#92c5de", 2: "#999999", 3: "#f4a582", 4: "#b2182b"}
 
 POSTS = []
+
+# TEMP VARS
+cluster_results = []
+
+agent_counts = [20, 20, 20, 20, 20]
+
+post_name = "post2"
 
 class OpinionAgent(Agent[OpinionConfig]):
 
@@ -76,80 +84,71 @@ def plot_belief_counts(counts_long, fps=60, every=10, x_unit="minutes", save_pat
         fig.savefig(save_path, dpi=150)
     return fig, ax
 
-def read_post_counts(post):
-    pdf = pl.read_csv(post, separator="\t")
-    counts = {c: 0 for c in range(5)}
-    for v in pdf["political_position"].drop_nulls().to_list():
-        counts[BELIEFS[v.strip().lower()]] += 1
-    return counts
 
-def run_stats(post_csv_paths, p_adjust="bonferroni"):
-    groups, long_rows = [], []
-    for path in post_csv_paths:
-        vals = pl.read_csv(path)["num_clusters"].to_list()
-        groups.append(vals)
-        long_rows += [{"post": post, "num_clusters": v} for v in vals]
-    H, p = ss.kruskal(*groups)
-    print(f"Kruskal-Wallis: H = {H:.4f}, p = {p:.4g}")
-    dunn = sp.posthoc_dunn(pd.DataFrame(long_rows),
-                           val_col="num_clusters", group_col="post", p_adjust=p_adjust)
-    print(f"Dunn's test (p-values, {p_adjust}-adjusted):")
-    print(dunn)
-    return H, p, dunn
+# for i in len(POSTS):
+#     post = POSTS[i]
+#     post_name = f"post{i}"
 
-cluster_results = []
+#     cluster_results = []
 
-post_csv_paths = []
+#     agent_counts = read_tsv(post)
 
-for post in POSTS:
-    counts = read_post_counts(post)
+for seed in range(SEEDS):
 
-    cluster_results = []
+    random.seed(seed)
+    
+    start = time.time()
 
-    for seed in SEEDS:
+    df = (
+        # Step 1: Create a new simulation.
+        HeadlessSimulation(OpinionConfig(
+            image_rotation=False, 
+            movement_speed=1, 
+            radius=50,
+            fps_limit=60,
+            duration=10*60*60,
+            seed=seed
+            ))
+        # Step 2: Add 100 agents to the simulation.
+        .batch_spawn_agents(agent_counts[0], OpinionAgent, images=IMAGES, belief="left")
+        .batch_spawn_agents(agent_counts[1], OpinionAgent, images=IMAGES, belief="center-left")
+        .batch_spawn_agents(agent_counts[2], OpinionAgent, images=IMAGES, belief="middle")
+        .batch_spawn_agents(agent_counts[3], OpinionAgent, images=IMAGES, belief="center-right")
+        .batch_spawn_agents(agent_counts[4], OpinionAgent, images=IMAGES, belief="right")
 
-        df = (
-            # Step 1: Create a new simulation.
-            HeadlessSimulation(OpinionConfig(
-                image_rotation=True, 
-                movement_speed=1, 
-                radius=50,
-                fps_limit=60,
-                duration=10*60*60,
-                seed=seed
-                ))
-            # Step 2: Add 50 agents to the simulation.
-            .batch_spawn_agents(counts[0], OpinionAgent, images=IMAGES, belief="left")
-            .batch_spawn_agents(counts[1], OpinionAgent, images=IMAGES, belief="center-left")
-            .batch_spawn_agents(counts[2], OpinionAgent, images=IMAGES, belief="middle")
-            .batch_spawn_agents(counts[3], OpinionAgent, images=IMAGES, belief="center-right")
-            .batch_spawn_agents(counts[4], OpinionAgent, images=IMAGES, belief="right")
+        # Step 3: Profit! 🎉
+        .run()
+        .snapshots
+    )
 
-            # Step 3: Profit! 🎉
-            .run()
-            .snapshots
-        )
+    last_frame = df["frame"].max()
 
-        last_frame = df["frame"].max()
+    # Get the opinion cluster counts at the end of the simulation
+    num_opinion_clusters = len(df.filter(pl.col("frame") == last_frame).select("image_index").unique())
+    cluster_results.append({"seed": seed, "num_clusters": num_opinion_clusters})
 
-        # Get the opinion cluster counts at the end of the simulation
-        num_opinion_clusters = len(df.filter(pl.col("frame") == last_frame).select("image_index").unique())
-        cluster_results.append({"seed": seed, "num_clusters": num_opinion_clusters})
+    # Get the number of unique image_index for each frame of the simulation.
+    clusters_per_frame = (
+        df.group_by("frame")
+          .agg(pl.col("image_index").n_unique().alias("num_unique_clusters"))
+          .sort("frame")
+    )
+    
+    pl.DataFrame(clusters_per_frame).write_csv(f"cluster_counts_per_frame_{post_name}_seed_{seed}.csv")
 
-        # Get the number of agents for  counts at the end of the simulation
-        counts_long = df.group_by(["frame", "image_index"]).len().rename({"len": "count"}).sort(["frame", "image_index"])
+    # Number of agents holding each belief, per frame (for the trajectory plot)
+    counts_long = (
+        df.group_by(["frame", "image_index"])
+          .len()
+          .rename({"len": "count"})
+          .sort(["frame", "image_index"])
+    )
 
-        counts_long.write_parquet(f"counts_{post}_seed_{seed}.parquet")
+    plot_belief_counts(counts_long, save_path=f"belief_trajectories_{post_name}_seed_{seed}.png")
+    
+    print("seed:",seed, "\nclusters:",num_opinion_clusters,"\n"+"-"*10)
+    end = time.time()
+    print(end - start)
 
-        print(num_opinion_clusters)
-
-        plot_belief_counts(counts_long, save_path=f"belief_trajectories_{post}_seed_{seed}.png")
-
-        # save results
-        df.write_parquet(f"results_{post}_seed_{seed}.parquet")
-
-    csv_path = f"cluster_counts_{post}.csv"
-    pl.DataFrame(cluster_results).write_csv(csv_path)
-    post_csv_paths.append(csv_path)
-
-run_stats(post_csv_paths)
+# Create CSV file with the final cluster amounts for current post -> 30 seeded runs
+pl.DataFrame(cluster_results).write_csv(f"cluster_counts_{post_name}.csv")
