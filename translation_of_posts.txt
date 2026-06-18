@@ -22,3 +22,20 @@ post4
 
 post5
 {"left": 35, "center-left": 30, "middle": 10, "center-right": 15, "right": 10}
+
+
+
+//////////////////
+
+post5
+{"left": 35, "center-left": 30, "middle": 10, "center-right": 15, "right": 10}
+post0
+{"left": 25, "center-left": 66, "middle": 8, "center-right": 0, "right": 1}
+post4
+{"left": 6, "center-left": 13, "middle": 79, "center-right": 2, "right": 0}
+post2
+{"left": 5, "center-left": 15, "middle": 30, "center-right": 40, "right": 10}
+post3
+{"left": 5, "center-left": 10, "middle": 20, "center-right": 25, "right": 40}
+post1
+{"left": 20, "center-left": 20, "middle": 20, "center-right": 20, "right": 20}
